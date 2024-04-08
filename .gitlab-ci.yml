@@ -1,0 +1,45 @@
+# Определение используемого образа и сервиса
+default:
+  image: docker:cli  # Используем образ docker:cli для доступа к Docker CLI
+  services:
+    - docker:dind    # Используем сервис docker:dind для запуска Docker внутри Docker
+
+# Настройка перед выполнением задач
+before_script:
+  - apk add git  # Устанавливаем git для возможности клонирования репозитория
+  - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"  # Логинимся в GitLab Registry
+
+# Определение стадий
+stages:
+  - build  # Определение стадии build
+
+# Задача сборки Docker образа для короткого хэша коммита
+build:job-1:
+  stage: build
+  variables:
+    DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA  # Определение имени Docker образа с тегом, основанным на коротком хэше коммита
+  script:
+    - docker build -t "$DOCKER_IMAGE_NAME" .  # Сборка Docker образа из текущего контекста
+    - echo "docker image $DOCKER_IMAGE_NAME"  # Вывод информации о собранном образе
+    - docker push "$DOCKER_IMAGE_NAME"  # Загрузка образа в GitLab Registry
+    - docker image ls  # Вывод списка Docker образов
+    - docker rmi "$DOCKER_IMAGE_NAME"  # Удаление Docker образа
+    - docker image ls  # Вывод списка Docker образов после удаления
+  rules:
+    - when: manual  # Задача выполняется вручную
+
+# Задача сборки Docker образа для тега коммита
+build:job-2:
+  stage: build
+  variables:
+    DOCKER_IMAGE_NAME: $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG  # Определение имени Docker образа с тегом, основанным на теге коммита
+  script:
+    - docker build -t "$DOCKER_IMAGE_NAME" .  # Сборка Docker образа из текущего контекста
+    - echo "docker image $DOCKER_IMAGE_NAME"  # Вывод информации о собранном образе
+    - docker push "$DOCKER_IMAGE_NAME"  # Загрузка образа в GitLab Registry
+    - docker image ls  # Вывод списка Docker образов
+    - docker rmi "$DOCKER_IMAGE_NAME"  # Удаление Docker образа
+    - docker image ls  # Вывод списка Docker образов после удаления
+  rules:
+    - if: $CI_COMMIT_TAG  # Задача выполняется всегда, если установлен тег коммита
+      when: always
